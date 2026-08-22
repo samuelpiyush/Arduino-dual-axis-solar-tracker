@@ -278,7 +278,7 @@ Observed operation includes:
 ---
 
 ## Prototype
-[Solar Tracker Prototype](images/prototype.jpg)
+[Solar Tracker Prototype](Images/Prototype.jpg)
 
 
 
@@ -514,15 +514,6 @@ The system can be adapted for:
 
 ---
 
-## Documentation
-
-The complete project documentation is available in the `docs/` directory.
-
-* [Project Report](docs/project-report.pdf)
-* [System Architecture](docs/system-architecture.png)
-* [Circuit Diagram](docs/circuit-diagram.png)
-
----
 
 ## License
 
