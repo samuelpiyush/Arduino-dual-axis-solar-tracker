@@ -102,6 +102,12 @@ The Arduino repeatedly measures the two LDR values and adjusts the servo wheneve
 
 ---
 
+<p align="center">
+  <img src="./Images/Prototype.jpg" width="800"><br/>
+  <i>System Prototype</i>
+</p>
+---
+
 ## Hardware Components
 
 | Component             | Quantity | Purpose                            |
@@ -259,6 +265,11 @@ Update LCD
    │
    └──────────────↺
 ```
+---
+<p align="center">
+  <img src="./Images/Circuit-Diagram&info.jpg" width="800"><br/>
+  <i>Circuit Diagram</i>
+</p>
 
 ---
 
@@ -276,11 +287,6 @@ Observed operation includes:
 * Successful operation of the prototype under controlled lighting conditions.
 
 ---
-
-## Prototype
-[Solar Tracker Prototype](Images/Prototype.jpg)
-
-
 
 ## Software
 
