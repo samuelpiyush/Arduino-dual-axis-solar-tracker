@@ -279,24 +279,190 @@ Observed operation includes:
 
 ## Prototype
 [Solar Tracker Prototype](images/prototype.jpg)
-```
 
-Suggested photographs:
-
-* Complete solar-tracker prototype
-* Front view of solar panel
-* Two-LDR arrangement
-* Arduino and electronics
-* Servo mechanism
-* LCD display during operation
-* Testing setup
-
----
 
 
 ## Software
 
 The project is programmed using the **Arduino IDE**.
+
+
+## Code
+```
+#include <Servo.h>
+#include <LiquidCrystal.h>
+#include <math.h>
+
+// ---------------- LCD ----------------
+// RS, EN, D4, D5, D6, D7
+LiquidCrystal lcd(2, 3, 4, 5, 6, 7);
+
+// ---------------- Single-axis tracker ----------------
+Servo trackerServo;
+
+const int pinServo = 10;       // Servo signal -> D10
+const int ldrLeftPin = A0;     // Left LDR divider midpoint -> A0
+const int ldrRightPin = A1;    // Right LDR divider midpoint -> A1
+
+int servoPos = 90;
+const int servoLimitLow = 5;
+const int servoLimitHigh = 180;
+const int servoStep = 2;
+
+const float alpha = 0.25f;     // EMA smoothing
+const int deadband = 6;
+const int moveDelay = 10;
+
+float filteredLeft = 0.0f;
+float filteredRight = 0.0f;
+
+// ---------------- ACS712 current sensor ----------------
+const int currentSensorPin = A6;   // ACS712 OUT -> A6
+float ACS_SENSITIVITY = 0.185f;    // 5 A module; change if using 20 A/30 A version
+const float VREF = 5.0f;
+const int ADC_MAX = 1023;
+int invertSign = 1;
+
+const int CAL_SAMPLES = 200;
+const int CURRENT_SAMPLES = 12;
+float zeroADC = 512.0f;
+
+// ---------------- Panel voltage divider ----------------
+// Solar panel + -> 30 kOhm -> A7 -> 10 kOhm -> GND
+const int panelPin = A7;
+const float Rtop = 30000.0f;
+const float Rbottom = 10000.0f;
+const float DIV_FACTOR = Rbottom / (Rtop + Rbottom);
+
+const int OVERSAMPLE_COUNT = 64;
+
+// ---------------- LCD timing ----------------
+unsigned long lastLCD = 0;
+const unsigned long LCD_INTERVAL = 400;
+
+int clampServo(int value) {
+  if (value < servoLimitLow) return servoLimitLow;
+  if (value > servoLimitHigh) return servoLimitHigh;
+  return value;
+}
+
+float readPanelVoltage() {
+  long total = 0;
+  for (int i = 0; i < OVERSAMPLE_COUNT; ++i) {
+    total += analogRead(panelPin);
+    delayMicroseconds(50);
+  }
+
+  float avgADC = (float)total / OVERSAMPLE_COUNT;
+  float vAdc = (avgADC / ADC_MAX) * VREF;
+  return vAdc / DIV_FACTOR;
+}
+
+float readCurrentAmps() {
+  long total = 0;
+
+  for (int i = 0; i < CURRENT_SAMPLES; ++i) {
+    total += analogRead(currentSensorPin);
+    delay(2);
+  }
+
+  float avgADC = (float)total / CURRENT_SAMPLES;
+  float vOut = (avgADC / ADC_MAX) * VREF;
+  float vZero = (zeroADC / ADC_MAX) * VREF;
+
+  return invertSign * ((vOut - vZero) / ACS_SENSITIVITY);
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  lcd.begin(16, 2);
+  lcd.print("Tracker start");
+
+  trackerServo.attach(pinServo);
+  servoPos = clampServo(servoPos);
+  trackerServo.write(servoPos);
+
+  filteredLeft = analogRead(ldrLeftPin);
+  filteredRight = analogRead(ldrRightPin);
+
+  // ACS712 zero-current calibration.
+  // Ensure no current is flowing through the sensor during startup calibration.
+  long total = 0;
+  for (int i = 0; i < CAL_SAMPLES; ++i) {
+    total += analogRead(currentSensorPin);
+    delay(5);
+  }
+  zeroADC = (float)total / CAL_SAMPLES;
+
+  delay(700);
+  lcd.clear();
+}
+
+void loop() {
+  // ---------- Read and filter LDRs ----------
+  int rawLeft = analogRead(ldrLeftPin);
+  int rawRight = analogRead(ldrRightPin);
+
+  filteredLeft =
+      alpha * rawLeft + (1.0f - alpha) * filteredLeft;
+  filteredRight =
+      alpha * rawRight + (1.0f - alpha) * filteredRight;
+
+  float lightError = filteredLeft - filteredRight;
+
+  // ---------- Single-axis tracking ----------
+  if (abs(lightError) > deadband) {
+    if (lightError > 0) {
+      servoPos -= servoStep;
+    } else {
+      servoPos += servoStep;
+    }
+
+    servoPos = clampServo(servoPos);
+    trackerServo.write(servoPos);
+  }
+
+  // ---------- Electrical monitoring ----------
+  float currentAmps = readCurrentAmps();
+  float panelVoltage = readPanelVoltage();
+
+  // ---------- LCD ----------
+  unsigned long now = millis();
+
+  if (now - lastLCD >= LCD_INTERVAL) {
+    lastLCD = now;
+
+    lcd.setCursor(0, 0);
+    lcd.print("V:");
+    lcd.print(panelVoltage, 2);
+    lcd.print(" I:");
+    lcd.print(currentAmps, 2);
+    lcd.print(" ");
+
+    lcd.setCursor(0, 1);
+    lcd.print("L:");
+    lcd.print((int)filteredLeft);
+    lcd.print(" R:");
+    lcd.print((int)filteredRight);
+    lcd.print(" ");
+
+    Serial.print("Left:");
+    Serial.print(filteredLeft);
+    Serial.print(" Right:");
+    Serial.print(filteredRight);
+    Serial.print(" Error:");
+    Serial.print(lightError);
+    Serial.print(" Servo:");
+    Serial.print(servoPos);
+    Serial.print(" V:");
+    Serial.print(panelVoltage, 3);
+    Serial.print(" I:");
+    Serial.println(currentAmps, 3);
+  }
+
+  delay(moveDelay);
+}
 
 ### Main Arduino Libraries
 
